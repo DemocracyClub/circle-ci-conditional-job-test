@@ -1,0 +1,19 @@
+version: 2.1
+
+orbs:
+  python: circleci/python@1.5.0
+
+jobs:
+  run-the-application:
+    docker:
+      - image: cimg/python:3.10.2
+    steps:
+      - checkout
+      - run:
+          name: Run application
+          command: python application/code/main.py
+
+workflows:
+  conditional-run-application: 
+    jobs:
+      - run-the-application
