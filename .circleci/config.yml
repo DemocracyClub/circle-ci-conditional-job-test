@@ -10,6 +10,9 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Should we run the application?
+          command: CIRCLE_BASE_REVISION=<<pipeline.git.base_revision>> ./should-run-application.sh
+      - run:
           name: Run application
           command: python application/code/main.py
 
