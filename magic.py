@@ -1,21 +1,10 @@
+import argparse
+import json
+import os
 import re
 import subprocess
-
-
-cases = {
-    "Changes to appliation only": (
-        "b3798f31ebe3632b1624124bae9b3319aca23554",
-        "84d487ee66578b37204a64dce4e3d6b5521eb6ea"
-    ),
-    "Changes to both app and import scripts": (
-        "b3798f31ebe3632b1624124bae9b3319aca23554",
-        "6976d5f23850956e4af425e9d27b3a651a718e4d"
-    ),
-    "Changes to import script only": (
-        "6976d5f23850956e4af425e9d27b3a651a718e4d",
-        "84d487ee66578b37204a64dce4e3d6b5521eb6ea"
-    )
-}
+import sys
+import http.client
 
 
 def get_paths_changed(from_sha, to_sha):
@@ -23,37 +12,82 @@ def get_paths_changed(from_sha, to_sha):
     output = subprocess.check_output(args)
     return output.decode().splitlines()
 
+
 def is_import_script(path):
     if re.search("import_[^\.]+\.py", path):
         return True
     return False
 
+
 def any_import_scripts(changed):
     return any(is_import_script(path) for path in changed)
+
 
 def any_non_import_scripts(changed):
     return any(not is_import_script(path) for path in changed)
 
-def should_run_import_scripts(from_sha, to_sha, post_deploy=False):
-    changed = get_paths_changed(*shas)
+
+def should_run_import_scripts(from_sha, to_sha, action):
+    changed = get_paths_changed(from_sha, to_sha)
     has_imports = any_import_scripts(changed)
-    has_appliation = any_non_import_scripts(changed)
-    if has_appliation and not post_deploy:
-        return "Not running import scripts, needs deploy"
-    if has_imports and not has_appliation and not post_deploy:
-        return "Just running import scripts"
-    if has_imports and has_appliation and post_deploy:
-        return "Finished deploy, running import scripts"
-    if not has_imports and post_deploy:
-        return "A deploy happened and nothing else is left to be done"
+    has_application = any_non_import_scripts(changed)
+    if has_application and action != "post_deploy":
+        sys.stdout.write("Not running import scripts, needs deploy\n")
+        return False
+    if (
+        has_imports
+        and not has_application
+        and action not in ["post_deploy", "exit_early"]
+    ):
+        sys.stdout.write("Just running import scripts\n")
+        return True
+    if has_imports and has_application and action == "post_deploy":
+        sys.stdout.write("Finished deploy, running import scripts\n")
+        return True
+    if not has_imports and action == "post_deploy":
+        sys.stdout.write("A deploy happened and nothing else is left to be done\n")
+        return False
+    if has_imports and not has_application and action == "exit_early":
+        return True
 
-for case, shas in cases.items():
-    for job in ("First run", "Second run"):
-        print(f"{case}: {job}")
-        kwargs = {"post_deploy": False}
-        if job == "Second run":
-            kwargs["post_deploy"] = True
-        out = should_run_import_scripts(*shas, **kwargs)
-        print(f"\t{out}")
-    print()
 
+# def stop_ci_workflow():
+#     CIRCLE_TOKEN = os.environ.get("CIRCLE_TOKEN")
+#     CIRCLE_WORKFLOW_ID = os.environ.get("CIRCLE_WORKFLOW_ID")
+#     conn = http.client.HTTPSConnection("circleci.com")
+#     headers = {"Circle-Token": CIRCLE_TOKEN}
+#     conn.request("POST", f"/api/v2/workflow/{CIRCLE_WORKFLOW_ID}/cancel", headers=headers)
+#     res = conn.getresponse()
+#     data = res.read()
+#     print(data.decode("utf-8"))
+
+
+def stop_job():
+    args = ["circleci-agent", "step", "halt"]
+    subprocess.check_output(args)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        prog="ImportScriptRunner",
+        description="""
+            Checks the files changed between two GIT commits
+            and decides if import scripts should be run
+            """,
+    )
+    parser.add_argument("from_sha")
+    parser.add_argument("to_sha")
+    parser.add_argument(
+        "--action",
+        action="store",
+        choices=["run_imports", "exit_early", "post_deploy"],
+    )
+    args = parser.parse_args()
+    print(args)
+    should_run = should_run_import_scripts(args.from_sha, args.to_sha, args.action)
+    if should_run and args.action == "run_imports":
+        print("Running import scripts")
+    if should_run and args.action == "exit_early":
+        stop_job()
+    if should_run and args.action == "post_deploy":
+        print("Running import scripts")

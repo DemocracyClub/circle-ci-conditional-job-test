@@ -4,19 +4,46 @@ orbs:
   python: circleci/python@1.5.0
 
 jobs:
-  run-the-application:
+  run-the-imports:
     docker:
       - image: cimg/python:3.10.2
     steps:
       - checkout
       - run:
-          name: Should we run the application?
-          command: CIRCLE_BASE_REVISION=<<pipeline.git.base_revision>> ./should-run-application.sh
+          name: Should we run import scripts?
+          command: python magic.py 6976d5f23850956e4af425e9d27b3a651a718e4d 84d487ee66578b37204a64dce4e3d6b5521eb6ea
       - run:
           name: Run application
           command: python application/code/main.py
-
+  do-the-long-deploy:
+    docker:
+      - image: cimg/python:3.10.2
+    steps:
+      - checkout
+      - run:
+          name: Should we run import scripts?
+          command: python magic.py 6976d5f23850956e4af425e9d27b3a651a718e4d 84d487ee66578b37204a64dce4e3d6b5521eb6ea --action exit_early
+      - run:
+          name: "deploy"
+          command: sleep 100
+  post-deploy-tasks:
+    docker:
+      - image: cimg/python:3.10.2
+    steps:
+      - checkout
+      - run:
+          name: "Post deploy tasks"
+          command: python magic.py 6976d5f23850956e4af425e9d27b3a651a718e4d 84d487ee66578b37204a64dce4e3d6b5521eb6ea --action post_deploy
 workflows:
   conditional-run-application: 
     jobs:
-      - run-the-application
+      - run-the-imports:
+          context: [ CircleCIAPIUser ]
+      - do-the-long-deploy:
+          name: do-the-long-deploy
+          requires:
+          - run-the-imports
+      - post-deploy-tasks:
+          context: [ CircleCIAPIUser ]
+          requires:
+            - do-the-long-deploy
