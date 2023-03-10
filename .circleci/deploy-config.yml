@@ -34,12 +34,14 @@ jobs:
           name: "Post deploy tasks"
           command: python magic.py 6976d5f23850956e4af425e9d27b3a651a718e4d 84d487ee66578b37204a64dce4e3d6b5521eb6ea --action post_deploy
 workflows:
-  conditional-run-application: 
+  conditional-deploy:
+    when: << pipeline.parameters.application-changed >>
     jobs:
       - do-the-long-deploy:
-          when: << pipeline.parameters.application-changed >>
-          name: do-the-long-deploy
+        name: do-the-long-deploy
+  conditional-run-imports
+    when: << pipeline.parameters.imports-changed >>
+    jobs:
       - post-deploy-tasks:
-          when: << pipeline.parameters.imports-changed >>
-          requires:
-            - do-the-long-deploy
+        requires:
+        - do-the-long-deploy
