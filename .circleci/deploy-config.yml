@@ -38,10 +38,9 @@ workflows:
     when: << pipeline.parameters.application-changed >>
     jobs:
       - do-the-long-deploy:
-        name: do-the-long-deploy
+          name: do-the-long-deploy
   conditional-run-imports:
     when: << pipeline.parameters.imports-changed >>
     jobs:
       - post-deploy-tasks:
-        requires:
-        - do-the-long-deploy
+          requires: [do-the-long-deploy]
