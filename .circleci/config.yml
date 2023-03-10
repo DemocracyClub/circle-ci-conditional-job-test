@@ -1,49 +1,30 @@
 version: 2.1
 
-orbs:
-  python: circleci/python@1.5.0
+# this allows you to use CircleCI's dynamic configuration feature
+setup: true
 
-jobs:
-  run-the-imports:
-    docker:
-      - image: cimg/python:3.10.2
-    steps:
-      - checkout
-      - run:
-          name: Should we run import scripts?
-          command: python magic.py 6976d5f23850956e4af425e9d27b3a651a718e4d 84d487ee66578b37204a64dce4e3d6b5521eb6ea
-      - run:
-          name: Run application
-          command: python application/code/main.py
-  do-the-long-deploy:
-    docker:
-      - image: cimg/python:3.10.2
-    steps:
-      - checkout
-      - run:
-          name: Should we run import scripts?
-          command: python magic.py 6976d5f23850956e4af425e9d27b3a651a718e4d 84d487ee66578b37204a64dce4e3d6b5521eb6ea --action exit_early
-      - run:
-          name: "deploy"
-          command: sleep 100
-  post-deploy-tasks:
-    docker:
-      - image: cimg/python:3.10.2
-    steps:
-      - checkout
-      - run:
-          name: "Post deploy tasks"
-          command: python magic.py 6976d5f23850956e4af425e9d27b3a651a718e4d 84d487ee66578b37204a64dce4e3d6b5521eb6ea --action post_deploy
+# the path-filtering orb is required to continue a pipeline based on
+# the path of an updated fileset
+orbs:
+  path-filtering: circleci/path-filtering@0.1.1
+
 workflows:
-  conditional-run-application: 
+  # the always-run workflow is always triggered, regardless of the pipeline parameters.
+  always-run:
     jobs:
-      - run-the-imports:
-          context: [ CircleCIAPIUser ]
-      - do-the-long-deploy:
-          name: do-the-long-deploy
-          requires:
-          - run-the-imports
-      - post-deploy-tasks:
-          context: [ CircleCIAPIUser ]
-          requires:
-            - do-the-long-deploy
+      # the path-filtering/filter job determines which pipeline
+      # parameters to update.
+      - path-filtering/filter:
+          name: check-updated-files
+          # 3-column, whitespace-delimited mapping. One mapping per
+          # line:
+          # <regex path-to-test> <parameter-to-set> <value-of-pipeline-parameter>
+          mapping: |
+            application/import_scripts/import_.*.py imports-changed true
+            (?!application/import_scripts/import_.*.py) application-changed true
+          base-revision: master
+          # this is the path of the configuration we should trigger once
+          # path filtering and pipeline parameter value updates are
+          # complete. In this case, we are using the parent dynamic
+          # configuration itself.
+          config-path: .circleci/deploy-config.yml
