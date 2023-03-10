@@ -1,22 +1,30 @@
 version: 2.1
 
-orbs:
-  python: circleci/python@1.5.0
+# this allows you to use CircleCI's dynamic configuration feature
+setup: true
 
-jobs:
-  run-the-application:
-    docker:
-      - image: cimg/python:3.10.2
-    steps:
-      - checkout
-      - run:
-          name: Should we run the application?
-          command: CIRCLE_BASE_REVISION=<<pipeline.git.base_revision>> ./should-run-application.sh
-      - run:
-          name: Run application
-          command: python application/code/main.py
+# the path-filtering orb is required to continue a pipeline based on
+# the path of an updated fileset
+orbs:
+  path-filtering: circleci/path-filtering@0.1.1
 
 workflows:
-  conditional-run-application: 
+  # the always-run workflow is always triggered, regardless of the pipeline parameters.
+  always-run:
     jobs:
-      - run-the-application
+      # the path-filtering/filter job determines which pipeline
+      # parameters to update.
+      - path-filtering/filter:
+          name: check-updated-files
+          # 3-column, whitespace-delimited mapping. One mapping per
+          # line:
+          # <regex path-to-test> <parameter-to-set> <value-of-pipeline-parameter>
+          mapping: |
+            application/import_scripts/import_.*.py imports-changed true
+            (?!application/import_scripts/import_.*.py) application-changed true
+          base-revision: main
+          # this is the path of the configuration we should trigger once
+          # path filtering and pipeline parameter value updates are
+          # complete. In this case, we are using the parent dynamic
+          # configuration itself.
+          config-path: .circleci/deploy-config.yml

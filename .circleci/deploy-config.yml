@@ -1,0 +1,47 @@
+version: 2.1
+
+orbs:
+  python: circleci/python@1.5.0
+
+# the default pipeline parameters, which will be updated according to
+# the results of the path-filtering orb
+parameters:
+  imports-changed:
+    type: boolean
+    default: false
+  application-changed:
+    type: boolean
+    default: false
+
+jobs:
+  do-the-long-deploy:
+    docker:
+      - image: cimg/python:3.10.2
+    steps:
+      - checkout
+      - run:
+          name: Should we run import scripts?
+          command: python magic.py 6976d5f23850956e4af425e9d27b3a651a718e4d 84d487ee66578b37204a64dce4e3d6b5521eb6ea --action exit_early
+      - run:
+          name: "deploy"
+          command: sleep 100
+  run-imports:
+    docker:
+      - image: cimg/python:3.10.2
+    steps:
+      - checkout
+      - run:
+          name: "Post deploy tasks"
+          command: python magic.py 6976d5f23850956e4af425e9d27b3a651a718e4d 84d487ee66578b37204a64dce4e3d6b5521eb6ea --action post_deploy
+workflows:
+  conditional-deploy:
+    when: << pipeline.parameters.application-changed >>
+    jobs:
+      - do-the-long-deploy:
+          name: do-the-long-deploy
+      - run-imports:
+          requires: [do-the-long-deploy]
+  conditional-run-imports:
+    when: << pipeline.parameters.imports-changed >>
+    jobs:
+      - run-imports
