@@ -3,6 +3,16 @@ version: 2.1
 orbs:
   python: circleci/python@1.5.0
 
+# the default pipeline parameters, which will be updated according to
+# the results of the path-filtering orb
+parameters:
+  imports-changed:
+    type: boolean
+    default: false
+  application-changed:
+    type: boolean
+    default: false
+
 jobs:
   do-the-long-deploy:
     docker:
