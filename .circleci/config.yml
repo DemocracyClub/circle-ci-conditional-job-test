@@ -37,13 +37,17 @@ jobs:
 workflows:
   conditional-run-application: 
     jobs:
+      - hold:
+          type: approval
       - run-the-imports:
           context: [ CircleCIAPIUser ]
       - do-the-long-deploy:
           name: do-the-long-deploy
           requires:
           - run-the-imports
+          - hold
       - post-deploy-tasks:
           context: [ CircleCIAPIUser ]
           requires:
             - do-the-long-deploy
+            - hold
