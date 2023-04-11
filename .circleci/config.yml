@@ -37,6 +37,8 @@ jobs:
 workflows:
   conditional-run-application: 
     jobs:
+      - hold:
+          type: approval
       - run-the-imports:
           context: [ CircleCIAPIUser ]
       - do-the-long-deploy:
